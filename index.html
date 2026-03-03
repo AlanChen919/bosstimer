@@ -13,12 +13,11 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e272e; color: #d2dae2; margin: 0; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e272e; color: #d2dae2; margin: 0; padding: 20px; transition: box-shadow 0.3s; }
         h1 { text-align: center; color: #0fbcf9; margin-bottom: 10px; }
         .controls { text-align: center; margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
         .btn-permission { background: #ff3f34; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; }
         
-        /* Discord 開關樣式 */
         .discord-toggle { background: #2f3640; padding: 12px 20px; border-radius: 8px; border: 1px solid #7289da; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; }
         .discord-toggle input { transform: scale(1.5); cursor: pointer; }
         .discord-toggle span { font-weight: bold; color: #7289da; font-size: 1.1em; }
@@ -30,7 +29,13 @@
         .category-card { background: #485460; padding: 15px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); border-top: 5px solid #0fbcf9; margin-bottom: 10px; }
         .category-card h3 { margin: 0 0 10px 0; color: #fff; border-bottom: 1px solid #808e9b; padding-bottom: 5px; text-align: center; }
         .boss-row { display: flex; flex-direction: column; margin-bottom: 12px; background: #3c40c6; padding: 10px; border-radius: 8px; transition: background-color 0.3s; }
-        .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; font-size: 1.1em; }
+        
+        /* 標題與預計時間排版 */
+        .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .boss-name-group { display: flex; flex-direction: column; }
+        .boss-name { font-weight: bold; font-size: 1.1em; }
+        .expected-time { font-size: 0.85em; color: #a4b0be; margin-top: 2px; }
+        
         .boss-controls { display: flex; flex-direction: column; gap: 8px; }
         .input-group { display: flex; align-items: center; justify-content: space-between; font-weight: bold; }
         .button-group { display: flex; gap: 5px; justify-content: space-between; }
@@ -41,12 +46,17 @@
         .btn-start { background: #0be881; color: #1e272e; }
         .btn-stop { background: #ffc048; color: #1e272e; }
         
-        .status { font-weight: bold; color: #ffd32a; font-size: 1.1em; padding: 2px 6px; border-radius: 4px; }
+        .status { font-weight: bold; color: #ffd32a; font-size: 1.1em; padding: 2px 6px; border-radius: 4px; text-align: right; }
         .status.early-warning { color: #ff9f43; animation: blink 1s infinite alternate; }
         
+        /* 超時閃爍特效 (單格) */
         @keyframes flashRed { 0% { background-color: rgba(255, 63, 52, 0.5); } 100% { background-color: transparent; } }
         .overtime-flash { animation: flashRed 1s infinite; color: #ff3f34 !important; }
         @keyframes blink { from { opacity: 1; } to { opacity: 0.4; } }
+
+        /* 全螢幕背景閃爍特效 (5分鐘警告用) */
+        @keyframes pageFlash { 0% { box-shadow: inset 0 0 80px rgba(255, 63, 52, 0.9); } 100% { box-shadow: inset 0 0 0px transparent; } }
+        .body-flash { animation: pageFlash 1s infinite alternate; }
     </style>
 </head>
 <body>
@@ -57,7 +67,6 @@
             <input type="checkbox" id="discordCheckbox">
             <span>🖥️ 作為伺服器：發送 Discord 通知 (僅建議電腦端打勾)</span>
         </label>
-        <button class="btn-permission" onclick="requestPermission()">🔔 開啟網頁聲音權限</button>
     </div>
 
     <div class="grid-container" id="boss-grid"></div>
@@ -65,26 +74,22 @@
     <audio id="alarmSound" src="https://actions.google.com/sounds/v1/alarms/bugle_tune.ogg" preload="auto"></audio>
 
     <script>
-        // --- Discord 設定區 ---
         const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1478359998135537787/L1y7Tl_SWETDo7WuKSeGcNptfIDjtR0-TpwjcaIxWP5PrBrcmbhQj6yv1NqC4MnZ6YzC";
         
-        // 記住 Discord 開關狀態
         const discordCheckbox = document.getElementById('discordCheckbox');
         discordCheckbox.checked = localStorage.getItem('discordEnabled') === 'true';
         discordCheckbox.addEventListener('change', (e) => {
             localStorage.setItem('discordEnabled', e.target.checked);
         });
 
-        // 發送 Discord 訊息的函數
         function sendDiscordMsg(message) {
-            if (!discordCheckbox.checked) return; // 如果沒打勾，就不發送！避免手機跟電腦重複發
+            if (!discordCheckbox.checked) return; 
             fetch(DISCORD_WEBHOOK_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content: message })
             }).catch(err => console.log('Discord 發送失敗', err));
         }
-        // ----------------------
 
         const bossData = [
             { id: 'sx1', cat: '🦁 生肖區', name: '生肖 3-5', def: 240, color: '#f53b57' },
@@ -92,8 +97,8 @@
             { id: 'sx3', cat: '🦁 生肖區', name: '生肖 9-10', def: 300, color: '#f53b57' },
             { id: 'd1', cat: '🐉 獨立 BOSS', name: '龍宮', def: 360, color: '#0fbcf9' },
             { id: 'd2', cat: '🐉 獨立 BOSS', name: '達摩', def: 210, color: '#0fbcf9' },
-            { id: 'k1', cat: '⚔️ 三國專區', name: '三國跨服 A', def: 480, color: '#ffa801' },
-            { id: 'k2', cat: '⚔️ 三國專區', name: '三國跨服 B', def: 360, color: '#ffa801' },
+            { id: 'k1', cat: '⚔️ 三國專區', name: '久', def: 480, color: '#ffa801' },
+            { id: 'k2', cat: '⚔️ 三國專區', name: '快', def: 360, color: '#ffa801' },
             { id: 'l1', cat: '⚔️ 三國專區', name: '本服王', def: 300, color: '#ffa801' },
             { id: 'xj1', cat: '☁️ 仙境專區', name: '仙境', def: 240, color: '#9b59b6' }
         ];
@@ -108,7 +113,13 @@
                 bosses.forEach(b => {
                     html += `
                     <div class="boss-row" id="row_${b.id}">
-                        <div class="boss-info"><span>${b.name}</span> <span class="status" id="status_${b.id}">等待中</span></div>
+                        <div class="boss-info">
+                            <div class="boss-name-group">
+                                <span class="boss-name">${b.name}</span>
+                                <span class="expected-time" id="expected_${b.id}">--:-- 刷新</span>
+                            </div>
+                            <span class="status" id="status_${b.id}">等待中</span>
+                        </div>
                         <div class="boss-controls">
                             <div class="input-group"><span>剩餘分:</span> <input type="number" id="time_${b.id}" value="${b.def}"></div>
                             <div class="button-group">
@@ -156,10 +167,26 @@
 
         let localTimers = {};
         let warned = {};
+        let warningBosses = new Set(); // 記錄哪些 BOSS 進入 5 分鐘警告
+
+        function updateGlobalFlash() {
+            if (warningBosses.size > 0) {
+                document.body.classList.add('body-flash');
+            } else {
+                document.body.classList.remove('body-flash');
+            }
+        }
 
         function runLocalTimer(id, endTime, name) {
             if (localTimers[id]) clearInterval(localTimers[id]);
             warned[id] = false;
+            
+            // 計算預計刷新時間 (HH:MM)
+            const expectedDate = new Date(endTime);
+            const eh = String(expectedDate.getHours()).padStart(2, '0');
+            const em = String(expectedDate.getMinutes()).padStart(2, '0');
+            const expectedEl = document.getElementById('expected_' + id);
+            if(expectedEl) expectedEl.innerText = `${eh}:${em} 刷新`;
             
             const tick = () => {
                 const now = Date.now();
@@ -177,13 +204,25 @@
                     const s = diff % 60;
                     el.innerText = h > 0 ? `${h}時${m}分${s}秒` : `${m}分${s}秒`;
                     
-                    if (diff <= 300 && !warned[id]) {
-                        warned[id] = true;
-                        el.classList.add('early-warning');
-                        triggerNotice("⏳ 準備出發！", `${name} 5分鐘後刷新`);
-                        sendDiscordMsg(`⏳ **準備出發！** \n[${name}] 將在 5 分鐘後刷新！`);
+                    // 進入最後 5 分鐘
+                    if (diff <= 300) {
+                        warningBosses.add(id);
+                        updateGlobalFlash();
+                        
+                        if (!warned[id]) {
+                            warned[id] = true;
+                            el.classList.add('early-warning');
+                            sendDiscordMsg(`@here ⏳ **準備出發！** \n[${name}] 將在 5 分鐘後刷新！`);
+                        }
+                    } else {
+                        warningBosses.delete(id);
+                        updateGlobalFlash();
                     }
                 } else {
+                    // 超時狀態
+                    warningBosses.delete(id);
+                    updateGlobalFlash();
+                    
                     const overSec = Math.abs(diff);
                     const overM = Math.floor(overSec / 60);
                     const overS = overSec % 60;
@@ -191,12 +230,11 @@
                     el.classList.remove('early-warning');
                     el.classList.add('overtime-flash');
                     rowEl.classList.add('overtime-flash');
-                    el.innerText = `🚨已刷新 (超時 ${overM}分${overS}秒)`;
+                    el.innerText = `🚨超時 ${overM}分${overS}秒`;
                     
                     if (warned[id] !== 'done') {
                         warned[id] = 'done';
-                        triggerNotice("🚨 BOSS 刷新！", `${name} 已經刷新了！`);
-                        sendDiscordMsg(`🚨 **BOSS 已經刷新！** \n快上！[${name}] 已經出了！`);
+                        sendDiscordMsg(`@here 🚨 **BOSS 已經刷新！** \n快上！[${name}] 已經出了！`);
                     }
                 }
             };
@@ -206,13 +244,20 @@
 
         function stopLocalTimer(id) {
             if (localTimers[id]) clearInterval(localTimers[id]);
+            
+            warningBosses.delete(id);
+            updateGlobalFlash();
+
             const el = document.getElementById('status_' + id);
             const rowEl = document.getElementById('row_' + id);
+            const expectedEl = document.getElementById('expected_' + id);
+            
             if(el && rowEl) { 
                 el.innerText = "等待中"; 
                 el.style.color = "#ffd32a"; 
                 el.classList.remove('early-warning', 'overtime-flash'); 
                 rowEl.classList.remove('overtime-flash');
+                if(expectedEl) expectedEl.innerText = "--:-- 刷新";
             }
         }
 
@@ -229,16 +274,6 @@
 
         function clearCloud(id) { 
             if(db) db.ref('bosses/' + id).remove(); 
-        }
-
-        function triggerNotice(title, body) {
-            const audio = document.getElementById('alarmSound');
-            audio.currentTime = 0;
-            audio.play().catch(()=>{});
-        }
-
-        function requestPermission() { 
-            alert("網頁提示音已準備就緒！Discord 通知請依賴手機 App 設定。");
         }
     </script>
 </body>
