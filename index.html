@@ -7,37 +7,35 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #1e272e; color: #d2dae2; margin: 0; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e272e; color: #d2dae2; margin: 0; padding: 20px; }
         h1 { text-align: center; color: #0fbcf9; margin-bottom: 10px; }
         .controls { text-align: center; margin-bottom: 20px; }
-        .btn-permission { background: #ff3f34; color: white; padding: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-permission { background: #ff3f34; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; }
+        .btn-permission:hover { background: #ff5e57; }
 
-        /* 網格排版：電腦 4 格 -> 平板 2 格 -> 手機 1 格 */
-        .grid-container { 
-            display: grid; 
-            grid-template-columns: repeat(4, 1fr); 
-            gap: 15px; 
-            max-width: 1400px; 
-            margin: 0 auto; 
-        }
+        /* 排版：電腦一行4格，縮小時變2格，手機1格 */
+        .grid-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; max-width: 1400px; margin: 0 auto; }
         @media (max-width: 1100px) { .grid-container { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 600px) { .grid-container { grid-template-columns: 1fr; } }
 
         .category-card { background: #485460; padding: 15px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); border-top: 5px solid #0fbcf9; margin-bottom: 10px; }
         .category-card h3 { margin: 0 0 10px 0; color: #fff; border-bottom: 1px solid #808e9b; padding-bottom: 5px; text-align: center; }
         .boss-row { display: flex; flex-direction: column; margin-bottom: 12px; background: #3c40c6; padding: 10px; border-radius: 8px; }
-        .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; font-size: 1em; }
+        .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; font-size: 1.1em; }
         .boss-controls { display: flex; flex-direction: column; gap: 8px; }
-        .input-group { display: flex; align-items: center; justify-content: space-between; }
+        .input-group { display: flex; align-items: center; justify-content: space-between; font-weight: bold; }
         .button-group { display: flex; gap: 5px; justify-content: space-between; }
         
-        input[type="number"] { width: 50px; padding: 5px; border-radius: 4px; border: none; text-align: center; font-weight: bold; }
-        button { cursor: pointer; border: none; border-radius: 4px; padding: 8px; font-weight: bold; font-size: 0.9em; flex: 1; }
+        input[type="number"] { width: 55px; padding: 5px; border-radius: 4px; border: none; text-align: center; font-weight: bold; }
+        button.action-btn { cursor: pointer; border: none; border-radius: 4px; padding: 8px; font-weight: bold; font-size: 0.9em; flex: 1; transition: 0.2s; }
         .btn-default { background: #3498db; color: white; }
+        .btn-default:hover { background: #2980b9; }
         .btn-start { background: #0be881; color: #1e272e; }
+        .btn-start:hover { background: #05c46b; }
         .btn-stop { background: #ffc048; color: #1e272e; }
+        .btn-stop:hover { background: #ffa801; }
         
-        .status { font-weight: bold; color: #ffd32a; }
+        .status { font-weight: bold; color: #ffd32a; font-size: 1.1em; }
         .status.early-warning { color: #ff9f43; animation: blink 1s infinite alternate; }
         @keyframes blink { from { opacity: 1; } to { opacity: 0.4; } }
     </style>
@@ -46,7 +44,7 @@
 
     <h1>⚔️ BOSS 雲端同步器 ⚔️</h1>
     <div class="controls">
-        <button class="btn-permission" onclick="requestPermission()">🔔 開啟通知權限 (必點)</button>
+        <button class="btn-permission" onclick="requestPermission()">🔔 開啟通知權限 (手機務必點擊)</button>
     </div>
 
     <div class="grid-container" id="boss-grid"></div>
@@ -54,7 +52,6 @@
     <audio id="alarmSound" src="https://actions.google.com/sounds/v1/alarms/bugle_tune.ogg" preload="auto"></audio>
 
     <script>
-        // 1. 設定所有 BOSS 資料
         const bossData = [
             { id: 'sx1', cat: '🦁 生肖區', name: '生肖 3-5', def: 240, color: '#f53b57' },
             { id: 'sx2', cat: '🦁 生肖區', name: '生肖 6-8', def: 270, color: '#f53b57' },
@@ -67,7 +64,6 @@
             { id: 'xj1', cat: '☁️ 仙境專區', name: '仙境', def: 240, color: '#9b59b6' }
         ];
 
-        // 2. 絕對優先執行：把 UI 畫面畫出來！
         function renderUI() {
             const grid = document.getElementById('boss-grid');
             grid.innerHTML = "";
@@ -80,11 +76,11 @@
                     <div class="boss-row">
                         <div class="boss-info"><span>${b.name}</span> <span class="status" id="status_${b.id}">等待中</span></div>
                         <div class="boss-controls">
-                            <div class="input-group"><span>剩餘分鐘:</span> <input type="number" id="time_${b.id}" value="${b.def}"></div>
+                            <div class="input-group"><span>剩餘分:</span> <input type="number" id="time_${b.id}" value="${b.def}"></div>
                             <div class="button-group">
-                                <button class="btn-default" onclick="updateCloud('${b.id}', ${b.def})">預設</button>
-                                <button class="btn-start" onclick="manualStart('${b.id}')">開始</button>
-                                <button class="btn-stop" onclick="clearCloud('${b.id}')">清除</button>
+                                <button class="action-btn btn-default" onclick="updateCloud('${b.id}', ${b.def})">預設</button>
+                                <button class="action-btn btn-start" onclick="manualStart('${b.id}')">開始</button>
+                                <button class="action-btn btn-stop" onclick="clearCloud('${b.id}')">清除</button>
                             </div>
                         </div>
                     </div>`;
@@ -93,10 +89,10 @@
             });
         }
         
-        // 立即畫出介面
+        // 確保程式一啟動就先把畫面畫出來！
         renderUI();
 
-        // 3. 畫面出來後，再來處理 Firebase 雲端連線
+        // Firebase 設定與連線
         let db;
         try {
             const firebaseConfig = {
@@ -111,7 +107,6 @@
             if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
             db = firebase.database();
 
-            // 監聽雲端資料庫
             db.ref('bosses').on('value', (snapshot) => {
                 const data = snapshot.val() || {};
                 bossData.forEach(b => {
@@ -124,11 +119,9 @@
                 });
             });
         } catch (error) {
-            console.error("Firebase 連線發生錯誤:", error);
-            alert("目前無法連線到雲端資料庫，但畫面已載入！");
+            console.error("連線錯誤:", error);
         }
 
-        // 4. 計時器核心邏輯
         let localTimers = {};
         let warned = {};
 
@@ -140,7 +133,11 @@
                 const remain = Math.max(0, Math.round((endTime - now) / 1000));
                 const el = document.getElementById('status_' + id);
                 if(!el) return;
-                updateDisplay(el, remain);
+                
+                const h = Math.floor(remain / 3600);
+                const m = Math.floor((remain % 3600) / 60);
+                const s = remain % 60;
+                el.innerText = h > 0 ? `${h}時${m}分${s}秒` : `${m}分${s}秒`;
                 
                 if (remain <= 300 && remain > 0 && !warned[id]) {
                     warned[id] = true;
@@ -172,4 +169,32 @@
         function updateCloud(id, mins) {
             if(!db) return alert("尚未連上雲端！");
             const endTime = Date.now() + (mins * 60 * 1000);
-            db.ref
+            db.ref('bosses/' + id).set({ endTime: endTime });
+        }
+
+        function manualStart(id) {
+            const mins = document.getElementById('time_' + id).value;
+            updateCloud(id, mins);
+        }
+
+        function clearCloud(id) { 
+            if(db) db.ref('bosses/' + id).remove(); 
+        }
+
+        function triggerNotice(title, body) {
+            const audio = document.getElementById('alarmSound');
+            audio.currentTime = 0;
+            audio.play().catch(()=>{});
+            if (Notification.permission === "granted") {
+                new Notification(title, { body: body });
+            }
+        }
+
+        function requestPermission() { 
+            Notification.requestPermission().then(p => {
+                if(p === "granted") alert("通知權限已成功開啟！");
+            });
+        }
+    </script>
+</body>
+</html>
