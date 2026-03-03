@@ -4,43 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>生肖 BOSS 雲端同步器</title>
+    
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e272e">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e272e; color: #d2dae2; margin: 0; padding: 20px; }
         h1 { text-align: center; color: #0fbcf9; margin-bottom: 10px; }
-        .controls { text-align: center; margin-bottom: 20px; }
+        .controls { text-align: center; margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
         .btn-permission { background: #ff3f34; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; }
-        .btn-permission:hover { background: #ff5e57; }
+        
+        /* Discord 開關樣式 */
+        .discord-toggle { background: #2f3640; padding: 12px 20px; border-radius: 8px; border: 1px solid #7289da; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; }
+        .discord-toggle input { transform: scale(1.5); cursor: pointer; }
+        .discord-toggle span { font-weight: bold; color: #7289da; font-size: 1.1em; }
 
-        /* 排版：電腦一行4格，縮小時變2格，手機1格 */
         .grid-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; max-width: 1400px; margin: 0 auto; }
         @media (max-width: 1100px) { .grid-container { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 600px) { .grid-container { grid-template-columns: 1fr; } }
 
         .category-card { background: #485460; padding: 15px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); border-top: 5px solid #0fbcf9; margin-bottom: 10px; }
         .category-card h3 { margin: 0 0 10px 0; color: #fff; border-bottom: 1px solid #808e9b; padding-bottom: 5px; text-align: center; }
-        .boss-row { display: flex; flex-direction: column; margin-bottom: 12px; background: #3c40c6; padding: 10px; border-radius: 8px; }
+        .boss-row { display: flex; flex-direction: column; margin-bottom: 12px; background: #3c40c6; padding: 10px; border-radius: 8px; transition: background-color 0.3s; }
         .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; font-size: 1.1em; }
         .boss-controls { display: flex; flex-direction: column; gap: 8px; }
         .input-group { display: flex; align-items: center; justify-content: space-between; font-weight: bold; }
         .button-group { display: flex; gap: 5px; justify-content: space-between; }
         
         input[type="number"] { width: 55px; padding: 5px; border-radius: 4px; border: none; text-align: center; font-weight: bold; }
-        button.action-btn { cursor: pointer; border: none; border-radius: 4px; padding: 8px; font-weight: bold; font-size: 0.9em; flex: 1; transition: 0.2s; }
+        button.action-btn { cursor: pointer; border: none; border-radius: 4px; padding: 8px; font-weight: bold; font-size: 0.9em; flex: 1; }
         .btn-default { background: #3498db; color: white; }
-        .btn-default:hover { background: #2980b9; }
         .btn-start { background: #0be881; color: #1e272e; }
-        .btn-start:hover { background: #05c46b; }
         .btn-stop { background: #ffc048; color: #1e272e; }
-        .btn-stop:hover { background: #ffa801; }
         
-        .status { font-weight: bold; color: #ffd32a; font-size: 1.1em; }
+        .status { font-weight: bold; color: #ffd32a; font-size: 1.1em; padding: 2px 6px; border-radius: 4px; }
         .status.early-warning { color: #ff9f43; animation: blink 1s infinite alternate; }
+        
+        @keyframes flashRed { 0% { background-color: rgba(255, 63, 52, 0.5); } 100% { background-color: transparent; } }
+        .overtime-flash { animation: flashRed 1s infinite; color: #ff3f34 !important; }
         @keyframes blink { from { opacity: 1; } to { opacity: 0.4; } }
     </style>
 </head>
@@ -48,7 +53,11 @@
 
     <h1>⚔️ BOSS 雲端同步器 ⚔️</h1>
     <div class="controls">
-        <button class="btn-permission" onclick="requestPermission()">🔔 開啟通知權限 (手機務必點擊)</button>
+        <label class="discord-toggle">
+            <input type="checkbox" id="discordCheckbox">
+            <span>🖥️ 作為伺服器：發送 Discord 通知 (僅建議電腦端打勾)</span>
+        </label>
+        <button class="btn-permission" onclick="requestPermission()">🔔 開啟網頁聲音權限</button>
     </div>
 
     <div class="grid-container" id="boss-grid"></div>
@@ -56,6 +65,27 @@
     <audio id="alarmSound" src="https://actions.google.com/sounds/v1/alarms/bugle_tune.ogg" preload="auto"></audio>
 
     <script>
+        // --- Discord 設定區 ---
+        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1478359998135537787/L1y7Tl_SWETDo7WuKSeGcNptfIDjtR0-TpwjcaIxWP5PrBrcmbhQj6yv1NqC4MnZ6YzC";
+        
+        // 記住 Discord 開關狀態
+        const discordCheckbox = document.getElementById('discordCheckbox');
+        discordCheckbox.checked = localStorage.getItem('discordEnabled') === 'true';
+        discordCheckbox.addEventListener('change', (e) => {
+            localStorage.setItem('discordEnabled', e.target.checked);
+        });
+
+        // 發送 Discord 訊息的函數
+        function sendDiscordMsg(message) {
+            if (!discordCheckbox.checked) return; // 如果沒打勾，就不發送！避免手機跟電腦重複發
+            fetch(DISCORD_WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: message })
+            }).catch(err => console.log('Discord 發送失敗', err));
+        }
+        // ----------------------
+
         const bossData = [
             { id: 'sx1', cat: '🦁 生肖區', name: '生肖 3-5', def: 240, color: '#f53b57' },
             { id: 'sx2', cat: '🦁 生肖區', name: '生肖 6-8', def: 270, color: '#f53b57' },
@@ -77,7 +107,7 @@
                 let html = `<div class="category-card" style="border-top-color: ${bosses[0].color}"><h3>${cat}</h3>`;
                 bosses.forEach(b => {
                     html += `
-                    <div class="boss-row">
+                    <div class="boss-row" id="row_${b.id}">
                         <div class="boss-info"><span>${b.name}</span> <span class="status" id="status_${b.id}">等待中</span></div>
                         <div class="boss-controls">
                             <div class="input-group"><span>剩餘分:</span> <input type="number" id="time_${b.id}" value="${b.def}"></div>
@@ -93,10 +123,8 @@
             });
         }
         
-        // 確保程式一啟動就先把畫面畫出來！
         renderUI();
 
-        // Firebase 設定與連線
         let db;
         try {
             const firebaseConfig = {
@@ -132,31 +160,43 @@
         function runLocalTimer(id, endTime, name) {
             if (localTimers[id]) clearInterval(localTimers[id]);
             warned[id] = false;
+            
             const tick = () => {
                 const now = Date.now();
-                const remain = Math.max(0, Math.round((endTime - now) / 1000));
+                const diff = Math.round((endTime - now) / 1000);
                 const el = document.getElementById('status_' + id);
-                if(!el) return;
+                const rowEl = document.getElementById('row_' + id);
+                if(!el || !rowEl) return;
                 
-                const h = Math.floor(remain / 3600);
-                const m = Math.floor((remain % 3600) / 60);
-                const s = remain % 60;
-                el.innerText = h > 0 ? `${h}時${m}分${s}秒` : `${m}分${s}秒`;
-                
-                if (remain <= 300 && remain > 0 && !warned[id]) {
-                    warned[id] = true;
-                    el.classList.add('early-warning');
-                    triggerNotice("⏳ 準備出發！", `${name} 5分鐘後刷新`);
-                }
-                
-                if (remain <= 0) {
-                    clearInterval(localTimers[id]);
+                if (diff > 0) {
+                    el.classList.remove('overtime-flash');
+                    rowEl.classList.remove('overtime-flash');
+                    
+                    const h = Math.floor(diff / 3600);
+                    const m = Math.floor((diff % 3600) / 60);
+                    const s = diff % 60;
+                    el.innerText = h > 0 ? `${h}時${m}分${s}秒` : `${m}分${s}秒`;
+                    
+                    if (diff <= 300 && !warned[id]) {
+                        warned[id] = true;
+                        el.classList.add('early-warning');
+                        triggerNotice("⏳ 準備出發！", `${name} 5分鐘後刷新`);
+                        sendDiscordMsg(`⏳ **準備出發！** \n[${name}] 將在 5 分鐘後刷新！`);
+                    }
+                } else {
+                    const overSec = Math.abs(diff);
+                    const overM = Math.floor(overSec / 60);
+                    const overS = overSec % 60;
+                    
                     el.classList.remove('early-warning');
-                    el.innerText = "🚨已刷新！";
-                    el.style.color = "#ff3f34";
+                    el.classList.add('overtime-flash');
+                    rowEl.classList.add('overtime-flash');
+                    el.innerText = `🚨已刷新 (超時 ${overM}分${overS}秒)`;
+                    
                     if (warned[id] !== 'done') {
                         warned[id] = 'done';
                         triggerNotice("🚨 BOSS 刷新！", `${name} 已經刷新了！`);
+                        sendDiscordMsg(`🚨 **BOSS 已經刷新！** \n快上！[${name}] 已經出了！`);
                     }
                 }
             };
@@ -167,7 +207,13 @@
         function stopLocalTimer(id) {
             if (localTimers[id]) clearInterval(localTimers[id]);
             const el = document.getElementById('status_' + id);
-            if(el) { el.innerText = "等待中"; el.style.color = "#ffd32a"; el.classList.remove('early-warning'); }
+            const rowEl = document.getElementById('row_' + id);
+            if(el && rowEl) { 
+                el.innerText = "等待中"; 
+                el.style.color = "#ffd32a"; 
+                el.classList.remove('early-warning', 'overtime-flash'); 
+                rowEl.classList.remove('overtime-flash');
+            }
         }
 
         function updateCloud(id, mins) {
@@ -189,17 +235,11 @@
             const audio = document.getElementById('alarmSound');
             audio.currentTime = 0;
             audio.play().catch(()=>{});
-            if (Notification.permission === "granted") {
-                new Notification(title, { body: body });
-            }
         }
 
         function requestPermission() { 
-            Notification.requestPermission().then(p => {
-                if(p === "granted") alert("通知權限已成功開啟！");
-            });
+            alert("網頁提示音已準備就緒！Discord 通知請依賴手機 App 設定。");
         }
     </script>
 </body>
 </html>
-
