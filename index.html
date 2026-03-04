@@ -153,4 +153,123 @@
                 bossData.forEach(b => {
                     const info = data[b.id];
                     if (info && info.endTime) {
-                        runLocalTimer(
+                        runLocalTimer(b.id, info.endTime, b.name);
+                    } else {
+                        stopLocalTimer(b.id);
+                    }
+                });
+            });
+        } catch (error) {
+            console.error("連線錯誤:", error);
+        }
+
+        let localTimers = {};
+        let warned = {};
+        let warningBosses = new Set(); 
+
+        function updateGlobalFlash() {
+            if (warningBosses.size > 0) {
+                document.body.classList.add('body-flash');
+            } else {
+                document.body.classList.remove('body-flash');
+            }
+        }
+
+        function runLocalTimer(id, endTime, name) {
+            if (localTimers[id]) clearInterval(localTimers[id]);
+            warned[id] = false;
+            
+            const expectedDate = new Date(endTime);
+            const eh = String(expectedDate.getHours()).padStart(2, '0');
+            const em = String(expectedDate.getMinutes()).padStart(2, '0');
+            const expectedEl = document.getElementById('expected_' + id);
+            if(expectedEl) expectedEl.innerText = `${eh}:${em} 刷新`;
+            
+            const tick = () => {
+                const now = Date.now();
+                const diff = Math.round((endTime - now) / 1000);
+                const el = document.getElementById('status_' + id);
+                const rowEl = document.getElementById('row_' + id);
+                if(!el || !rowEl) return;
+                
+                if (diff > 0) {
+                    el.classList.remove('overtime-flash');
+                    rowEl.classList.remove('overtime-flash');
+                    
+                    const h = Math.floor(diff / 3600);
+                    const m = Math.floor((diff % 3600) / 60);
+                    const s = diff % 60;
+                    el.innerText = h > 0 ? `${h}時${m}分${s}秒` : `${m}分${s}秒`;
+                    
+                    if (diff <= 300) {
+                        warningBosses.add(id);
+                        updateGlobalFlash();
+                        
+                        if (!warned[id]) {
+                            warned[id] = true;
+                            el.classList.add('early-warning');
+                            sendDiscordMsg(`@here ⏳ **準備出發！** \n[${name}] 將在 5 分鐘後刷新！`);
+                        }
+                    } else {
+                        warningBosses.delete(id);
+                        updateGlobalFlash();
+                    }
+                } else {
+                    warningBosses.delete(id);
+                    updateGlobalFlash();
+                    
+                    const overSec = Math.abs(diff);
+                    const overM = Math.floor(overSec / 60);
+                    const overS = overSec % 60;
+                    
+                    el.classList.remove('early-warning');
+                    el.classList.add('overtime-flash');
+                    rowEl.classList.add('overtime-flash');
+                    el.innerText = `🚨超時 ${overM}分${overS}秒`;
+                    
+                    if (warned[id] !== 'done') {
+                        warned[id] = 'done';
+                        sendDiscordMsg(`@here 🚨 **BOSS 已經刷新！** \n快上！[${name}] 已經出了！`);
+                    }
+                }
+            };
+            tick();
+            localTimers[id] = setInterval(tick, 1000);
+        }
+
+        function stopLocalTimer(id) {
+            if (localTimers[id]) clearInterval(localTimers[id]);
+            
+            warningBosses.delete(id);
+            updateGlobalFlash();
+
+            const el = document.getElementById('status_' + id);
+            const rowEl = document.getElementById('row_' + id);
+            const expectedEl = document.getElementById('expected_' + id);
+            
+            if(el && rowEl) { 
+                el.innerText = "等待中"; 
+                el.style.color = "#ffd32a"; 
+                el.classList.remove('early-warning', 'overtime-flash'); 
+                rowEl.classList.remove('overtime-flash');
+                if(expectedEl) expectedEl.innerText = "--:-- 刷新";
+            }
+        }
+
+        function updateCloud(id, mins) {
+            if(!db) return alert("尚未連上雲端！");
+            const endTime = Date.now() + (mins * 60 * 1000);
+            db.ref('bosses/' + id).set({ endTime: endTime });
+        }
+
+        function manualStart(id) {
+            const mins = document.getElementById('time_' + id).value;
+            updateCloud(id, mins);
+        }
+
+        function clearCloud(id) { 
+            if(db) db.ref('bosses/' + id).remove(); 
+        }
+    </script>
+</body>
+</html>
