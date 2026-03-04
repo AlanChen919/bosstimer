@@ -7,9 +7,9 @@
   "theme_color": "#1e272e",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/182/182321.png",
+      "src": "https://media.discordapp.net/attachments/1251789913662296075/1478794816056987789/notdoro-4x.png?ex=69a9b27e&is=69a860fe&hm=715367e902ab60f1fd26f9130a1901136bbfaee3cad10b968f4421c40a8436a5&=&format=webp&quality=lossless",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/webp"
     }
   ]
 }
