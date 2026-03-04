@@ -29,22 +29,24 @@
         .category-card h3 { margin: 0 0 10px 0; color: #fff; border-bottom: 1px solid #808e9b; padding-bottom: 5px; text-align: center; }
         .boss-row { display: flex; flex-direction: column; margin-bottom: 12px; background: #3c40c6; padding: 10px; border-radius: 8px; transition: background-color 0.3s; }
         
-        .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .boss-name-group { display: flex; flex-direction: column; }
-        .boss-name { font-weight: bold; font-size: 1.1em; }
-        .expected-time { font-size: 0.85em; color: #a4b0be; margin-top: 2px; }
+        /* 標題與時間排版區 (加入強制不換行) */
+        .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 5px; }
+        .boss-name-group { display: flex; flex-direction: column; min-width: 0; }
+        .boss-name { font-weight: bold; font-size: 1.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .expected-time { font-size: 0.85em; color: #a4b0be; margin-top: 2px; white-space: nowrap; }
         
         .boss-controls { display: flex; flex-direction: column; gap: 8px; }
         .input-group { display: flex; align-items: center; justify-content: space-between; font-weight: bold; }
         .button-group { display: flex; gap: 5px; justify-content: space-between; }
         
-        input[type="number"] { width: 55px; padding: 5px; border-radius: 4px; border: none; text-align: center; font-weight: bold; }
-        button.action-btn { cursor: pointer; border: none; border-radius: 4px; padding: 8px; font-weight: bold; font-size: 0.9em; flex: 1; }
+        input[type="number"] { width: 50px; padding: 5px; border-radius: 4px; border: none; text-align: center; font-weight: bold; }
+        button.action-btn { cursor: pointer; border: none; border-radius: 4px; padding: 8px; font-weight: bold; font-size: 0.9em; flex: 1; white-space: nowrap; }
         .btn-default { background: #3498db; color: white; }
         .btn-start { background: #0be881; color: #1e272e; }
         .btn-stop { background: #ffc048; color: #1e272e; }
         
-        .status { font-weight: bold; color: #ffd32a; font-size: 1.1em; padding: 2px 6px; border-radius: 4px; text-align: right; }
+        /* 倒數計時數字區 (加入強制不換行) */
+        .status { font-weight: bold; color: #ffd32a; font-size: 1.05em; padding: 2px 0px; border-radius: 4px; text-align: right; white-space: nowrap; }
         .status.early-warning { color: #ff9f43; animation: blink 1s infinite alternate; }
         
         @keyframes flashRed { 0% { background-color: rgba(255, 63, 52, 0.5); } 100% { background-color: transparent; } }
@@ -85,7 +87,6 @@
             }).catch(err => console.log('Discord 發送失敗', err));
         }
 
-        // --- 這裡更新了你的 BOSS 清單 ---
         const bossData = [
             { id: 'sx1', cat: '🦁 生肖區', name: '生肖 3-5', def: 240, color: '#f53b57' },
             { id: 'sx2', cat: '🦁 生肖區', name: '生肖 6-8', def: 270, color: '#f53b57' },
@@ -112,7 +113,7 @@
                     <div class="boss-row" id="row_${b.id}">
                         <div class="boss-info">
                             <div class="boss-name-group">
-                                <span class="boss-name">${b.name}</span>
+                                <span class="boss-name" title="${b.name}">${b.name}</span>
                                 <span class="expected-time" id="expected_${b.id}">--:-- 刷新</span>
                             </div>
                             <span class="status" id="status_${b.id}">等待中</span>
@@ -152,123 +153,4 @@
                 bossData.forEach(b => {
                     const info = data[b.id];
                     if (info && info.endTime) {
-                        runLocalTimer(b.id, info.endTime, b.name);
-                    } else {
-                        stopLocalTimer(b.id);
-                    }
-                });
-            });
-        } catch (error) {
-            console.error("連線錯誤:", error);
-        }
-
-        let localTimers = {};
-        let warned = {};
-        let warningBosses = new Set(); 
-
-        function updateGlobalFlash() {
-            if (warningBosses.size > 0) {
-                document.body.classList.add('body-flash');
-            } else {
-                document.body.classList.remove('body-flash');
-            }
-        }
-
-        function runLocalTimer(id, endTime, name) {
-            if (localTimers[id]) clearInterval(localTimers[id]);
-            warned[id] = false;
-            
-            const expectedDate = new Date(endTime);
-            const eh = String(expectedDate.getHours()).padStart(2, '0');
-            const em = String(expectedDate.getMinutes()).padStart(2, '0');
-            const expectedEl = document.getElementById('expected_' + id);
-            if(expectedEl) expectedEl.innerText = `${eh}:${em} 刷新`;
-            
-            const tick = () => {
-                const now = Date.now();
-                const diff = Math.round((endTime - now) / 1000);
-                const el = document.getElementById('status_' + id);
-                const rowEl = document.getElementById('row_' + id);
-                if(!el || !rowEl) return;
-                
-                if (diff > 0) {
-                    el.classList.remove('overtime-flash');
-                    rowEl.classList.remove('overtime-flash');
-                    
-                    const h = Math.floor(diff / 3600);
-                    const m = Math.floor((diff % 3600) / 60);
-                    const s = diff % 60;
-                    el.innerText = h > 0 ? `${h}時${m}分${s}秒` : `${m}分${s}秒`;
-                    
-                    if (diff <= 300) {
-                        warningBosses.add(id);
-                        updateGlobalFlash();
-                        
-                        if (!warned[id]) {
-                            warned[id] = true;
-                            el.classList.add('early-warning');
-                            sendDiscordMsg(`@here ⏳ **準備出發！** \n[${name}] 將在 5 分鐘後刷新！`);
-                        }
-                    } else {
-                        warningBosses.delete(id);
-                        updateGlobalFlash();
-                    }
-                } else {
-                    warningBosses.delete(id);
-                    updateGlobalFlash();
-                    
-                    const overSec = Math.abs(diff);
-                    const overM = Math.floor(overSec / 60);
-                    const overS = overSec % 60;
-                    
-                    el.classList.remove('early-warning');
-                    el.classList.add('overtime-flash');
-                    rowEl.classList.add('overtime-flash');
-                    el.innerText = `🚨超時 ${overM}分${overS}秒`;
-                    
-                    if (warned[id] !== 'done') {
-                        warned[id] = 'done';
-                        sendDiscordMsg(`@here 🚨 **BOSS 已經刷新！** \n快上！[${name}] 已經出了！`);
-                    }
-                }
-            };
-            tick();
-            localTimers[id] = setInterval(tick, 1000);
-        }
-
-        function stopLocalTimer(id) {
-            if (localTimers[id]) clearInterval(localTimers[id]);
-            
-            warningBosses.delete(id);
-            updateGlobalFlash();
-
-            const el = document.getElementById('status_' + id);
-            const rowEl = document.getElementById('row_' + id);
-            const expectedEl = document.getElementById('expected_' + id);
-            
-            if(el && rowEl) { 
-                el.innerText = "等待中"; 
-                el.style.color = "#ffd32a"; 
-                el.classList.remove('early-warning', 'overtime-flash'); 
-                rowEl.classList.remove('overtime-flash');
-                if(expectedEl) expectedEl.innerText = "--:-- 刷新";
-            }
-        }
-
-        function updateCloud(id, mins) {
-            if(!db) return alert("尚未連上雲端！");
-            const endTime = Date.now() + (mins * 60 * 1000);
-            db.ref('bosses/' + id).set({ endTime: endTime });
-        }
-
-        function manualStart(id) {
-            const mins = document.getElementById('time_' + id).value;
-            updateCloud(id, mins);
-        }
-
-        function clearCloud(id) { 
-            if(db) db.ref('bosses/' + id).remove(); 
-        }
-    </script>
-</body>
-</html>
+                        runLocalTimer(
