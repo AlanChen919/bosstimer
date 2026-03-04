@@ -16,7 +16,6 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e272e; color: #d2dae2; margin: 0; padding: 20px; transition: box-shadow 0.3s; }
         h1 { text-align: center; color: #0fbcf9; margin-bottom: 10px; }
         .controls { text-align: center; margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
-        .btn-permission { background: #ff3f34; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; }
         
         .discord-toggle { background: #2f3640; padding: 12px 20px; border-radius: 8px; border: 1px solid #7289da; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; }
         .discord-toggle input { transform: scale(1.5); cursor: pointer; }
@@ -30,7 +29,6 @@
         .category-card h3 { margin: 0 0 10px 0; color: #fff; border-bottom: 1px solid #808e9b; padding-bottom: 5px; text-align: center; }
         .boss-row { display: flex; flex-direction: column; margin-bottom: 12px; background: #3c40c6; padding: 10px; border-radius: 8px; transition: background-color 0.3s; }
         
-        /* 標題與預計時間排版 */
         .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .boss-name-group { display: flex; flex-direction: column; }
         .boss-name { font-weight: bold; font-size: 1.1em; }
@@ -49,12 +47,10 @@
         .status { font-weight: bold; color: #ffd32a; font-size: 1.1em; padding: 2px 6px; border-radius: 4px; text-align: right; }
         .status.early-warning { color: #ff9f43; animation: blink 1s infinite alternate; }
         
-        /* 超時閃爍特效 (單格) */
         @keyframes flashRed { 0% { background-color: rgba(255, 63, 52, 0.5); } 100% { background-color: transparent; } }
         .overtime-flash { animation: flashRed 1s infinite; color: #ff3f34 !important; }
         @keyframes blink { from { opacity: 1; } to { opacity: 0.4; } }
 
-        /* 全螢幕背景閃爍特效 (5分鐘警告用) */
         @keyframes pageFlash { 0% { box-shadow: inset 0 0 80px rgba(255, 63, 52, 0.9); } 100% { box-shadow: inset 0 0 0px transparent; } }
         .body-flash { animation: pageFlash 1s infinite alternate; }
     </style>
@@ -70,8 +66,6 @@
     </div>
 
     <div class="grid-container" id="boss-grid"></div>
-
-    <audio id="alarmSound" src="https://actions.google.com/sounds/v1/alarms/bugle_tune.ogg" preload="auto"></audio>
 
     <script>
         const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1478359998135537787/L1y7Tl_SWETDo7WuKSeGcNptfIDjtR0-TpwjcaIxWP5PrBrcmbhQj6yv1NqC4MnZ6YzC";
@@ -91,16 +85,19 @@
             }).catch(err => console.log('Discord 發送失敗', err));
         }
 
+        // --- 這裡更新了你的 BOSS 清單 ---
         const bossData = [
             { id: 'sx1', cat: '🦁 生肖區', name: '生肖 3-5', def: 240, color: '#f53b57' },
             { id: 'sx2', cat: '🦁 生肖區', name: '生肖 6-8', def: 270, color: '#f53b57' },
             { id: 'sx3', cat: '🦁 生肖區', name: '生肖 9-10', def: 300, color: '#f53b57' },
             { id: 'd1', cat: '🐉 獨立 BOSS', name: '龍宮', def: 360, color: '#0fbcf9' },
-            { id: 'd2', cat: '🐉 獨立 BOSS', name: '達摩', def: 210, color: '#0fbcf9' },
-            { id: 'k1', cat: '⚔️ 三國專區', name: '久', def: 480, color: '#ffa801' },
-            { id: 'k2', cat: '⚔️ 三國專區', name: '快', def: 360, color: '#ffa801' },
+            { id: 'd2', cat: '🐉 獨立 BOSS', name: '達摩一', def: 210, color: '#0fbcf9' },
+            { id: 'd3', cat: '🐉 獨立 BOSS', name: '達摩三', def: 210, color: '#0fbcf9' },
+            { id: 'k1', cat: '⚔️ 三國專區', name: '三國跨服 久', def: 480, color: '#ffa801' },
+            { id: 'k2', cat: '⚔️ 三國專區', name: '三國跨服 快', def: 360, color: '#ffa801' },
             { id: 'l1', cat: '⚔️ 三國專區', name: '本服王', def: 300, color: '#ffa801' },
-            { id: 'xj1', cat: '☁️ 仙境專區', name: '仙境', def: 240, color: '#9b59b6' }
+            { id: 'xj1', cat: '☁️ 仙境專區', name: '仙境一', def: 240, color: '#9b59b6' },
+            { id: 'xj2', cat: '☁️ 仙境專區', name: '仙境二', def: 240, color: '#9b59b6' }
         ];
 
         function renderUI() {
@@ -167,7 +164,7 @@
 
         let localTimers = {};
         let warned = {};
-        let warningBosses = new Set(); // 記錄哪些 BOSS 進入 5 分鐘警告
+        let warningBosses = new Set(); 
 
         function updateGlobalFlash() {
             if (warningBosses.size > 0) {
@@ -181,7 +178,6 @@
             if (localTimers[id]) clearInterval(localTimers[id]);
             warned[id] = false;
             
-            // 計算預計刷新時間 (HH:MM)
             const expectedDate = new Date(endTime);
             const eh = String(expectedDate.getHours()).padStart(2, '0');
             const em = String(expectedDate.getMinutes()).padStart(2, '0');
@@ -204,7 +200,6 @@
                     const s = diff % 60;
                     el.innerText = h > 0 ? `${h}時${m}分${s}秒` : `${m}分${s}秒`;
                     
-                    // 進入最後 5 分鐘
                     if (diff <= 300) {
                         warningBosses.add(id);
                         updateGlobalFlash();
@@ -219,7 +214,6 @@
                         updateGlobalFlash();
                     }
                 } else {
-                    // 超時狀態
                     warningBosses.delete(id);
                     updateGlobalFlash();
                     
