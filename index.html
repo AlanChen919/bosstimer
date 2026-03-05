@@ -30,7 +30,6 @@
         .category-card h3 { margin: 0 0 10px 0; color: #fff; border-bottom: 1px solid #808e9b; padding-bottom: 5px; text-align: center; }
         .boss-row { display: flex; flex-direction: column; margin-bottom: 12px; background: #3c40c6; padding: 10px; border-radius: 8px; transition: background-color 0.3s; }
         
-        /* 排版不換行 */
         .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 5px; }
         .boss-name-group { display: flex; flex-direction: column; min-width: 0; }
         .boss-name { font-weight: bold; font-size: 1.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -80,7 +79,6 @@
             localStorage.setItem('discordEnabled', e.target.checked);
         });
 
-        // 授權音效播放 (解決瀏覽器阻擋自動播放聲音的問題)
         function initAudio() {
             const audio = document.getElementById('alarmSound');
             audio.play().then(() => {
@@ -92,7 +90,6 @@
             });
         }
 
-        // 播放提示音的專屬函數
         function playAlarm() {
             const audio = document.getElementById('alarmSound');
             audio.currentTime = 0;
@@ -108,6 +105,7 @@
             }).catch(err => console.log('Discord 發送失敗', err));
         }
 
+        // 修改：三國跨服快 預設改為 300
         const bossData = [
             { id: 'sx1', cat: '🦁 生肖區', name: '生肖 3-5', def: 240, color: '#f53b57' },
             { id: 'sx2', cat: '🦁 生肖區', name: '生肖 6-8', def: 270, color: '#f53b57' },
@@ -116,7 +114,7 @@
             { id: 'd2', cat: '🐉 獨立 BOSS', name: '達摩一', def: 210, color: '#0fbcf9' },
             { id: 'd3', cat: '🐉 獨立 BOSS', name: '達摩三', def: 210, color: '#0fbcf9' },
             { id: 'k1', cat: '⚔️ 三國專區', name: '三國跨服 久', def: 480, color: '#ffa801' },
-            { id: 'k2', cat: '⚔️ 三國專區', name: '三國跨服 快', def: 360, color: '#ffa801' },
+            { id: 'k2', cat: '⚔️ 三國專區', name: '三國跨服 快', def: 300, color: '#ffa801' },
             { id: 'l1', cat: '⚔️ 三國專區', name: '本服王', def: 300, color: '#ffa801' },
             { id: 'xj1', cat: '☁️ 仙境專區', name: '仙境一', def: 240, color: '#9b59b6' },
             { id: 'xj2', cat: '☁️ 仙境專區', name: '仙境二', def: 240, color: '#9b59b6' }
@@ -156,6 +154,11 @@
         renderUI();
 
         let db;
+        let currentEndTimes = {}; // 新增：精準記錄每一隻王的目標時間，防止互相干擾洗頻
+        let localTimers = {};
+        let warned = {};
+        let warningBosses = new Set(); 
+
         try {
             const firebaseConfig = {
                 apiKey: "AIzaSyBO3GguL4BiEaW39dzDzsFvzCXo7Xd4TNg",
@@ -174,19 +177,23 @@
                 bossData.forEach(b => {
                     const info = data[b.id];
                     if (info && info.endTime) {
-                        runLocalTimer(b.id, info.endTime, b.name);
+                        // 【防洗頻核心】：只有當這隻王的時間「真的被更改」時，才重新載入計時器
+                        if (currentEndTimes[b.id] !== info.endTime) {
+                            currentEndTimes[b.id] = info.endTime;
+                            runLocalTimer(b.id, info.endTime, b.name);
+                        }
                     } else {
-                        stopLocalTimer(b.id);
+                        // 如果雲端沒有這隻王，代表被清除了，安全關閉計時器
+                        if (currentEndTimes[b.id]) {
+                            delete currentEndTimes[b.id];
+                            stopLocalTimer(b.id);
+                        }
                     }
                 });
             });
         } catch (error) {
             console.error("連線錯誤:", error);
         }
-
-        let localTimers = {};
-        let warned = {};
-        let warningBosses = new Set(); 
 
         function updateGlobalFlash() {
             if (warningBosses.size > 0) {
@@ -213,7 +220,6 @@
                 const rowEl = document.getElementById('row_' + id);
                 if(!el || !rowEl) return;
                 
-                // 【半夜勿擾守衛】：取得目前小時 (0-23)，如果是 3點到 6點，就不加 @here
                 const currentHour = new Date().getHours();
                 const mentionTag = (currentHour >= 3 && currentHour < 7) ? "" : "@here ";
 
@@ -233,7 +239,7 @@
                         if (!warned[id]) {
                             warned[id] = true;
                             el.classList.add('early-warning');
-                            playAlarm(); // 觸發網頁音效
+                            playAlarm(); 
                             sendDiscordMsg(`${mentionTag}⏳ **準備出發！** \n[${name}] 將在 5 分鐘後刷新！`);
                         }
                     } else {
@@ -255,7 +261,7 @@
                     
                     if (warned[id] !== 'done') {
                         warned[id] = 'done';
-                        playAlarm(); // 觸發網頁音效
+                        playAlarm(); 
                         sendDiscordMsg(`${mentionTag}🚨 **BOSS 已經刷新！** \n快上！[${name}] 已經出了！`);
                     }
                 }
@@ -267,6 +273,7 @@
         function stopLocalTimer(id) {
             if (localTimers[id]) clearInterval(localTimers[id]);
             
+            warned[id] = false; // 徹底清除警告狀態
             warningBosses.delete(id);
             updateGlobalFlash();
 
