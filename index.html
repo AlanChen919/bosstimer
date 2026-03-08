@@ -22,7 +22,6 @@
         .discord-toggle input { transform: scale(1.3); cursor: pointer; }
         .discord-toggle span { font-weight: bold; color: #7289da; font-size: 0.95em; }
 
-        /* 網格排版：鎖定 850px 以下才變 2 格，確保 1080p 四分之一視窗 (960px) 依然是 4 格 */
         .grid-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 1400px; margin: 0 auto; }
         @media (max-width: 850px) { .grid-container { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 500px) { .grid-container { grid-template-columns: 1fr; } }
@@ -40,7 +39,6 @@
         .input-group { display: flex; align-items: center; justify-content: space-between; font-weight: bold; font-size: 0.9em; }
         .button-group { display: flex; gap: 4px; justify-content: space-between; }
         
-        /* 全新輸入框樣式：深色底、半透明 Placeholder */
         input[type="number"] { width: 45px; padding: 4px; border-radius: 4px; border: 1px solid #576574; background: #2f3542; color: #fff; text-align: center; font-weight: bold; outline: none; transition: 0.2s; }
         input[type="number"]::placeholder { color: rgba(255, 255, 255, 0.4); font-weight: normal; }
         input[type="number"]:focus { border-color: #0fbcf9; background: #1e272e; box-shadow: 0 0 5px rgba(15, 188, 249, 0.5); }
@@ -58,6 +56,10 @@
         @keyframes blink { from { opacity: 1; } to { opacity: 0.4; } }
         @keyframes pageFlash { 0% { box-shadow: inset 0 0 80px rgba(255, 63, 52, 0.9); } 100% { box-shadow: inset 0 0 0px transparent; } }
         .body-flash { animation: pageFlash 1s infinite alternate; }
+
+        /* 特殊暗王時刻表面板樣式 */
+        .schedule-box { background: rgba(0,0,0,0.2); border-radius: 6px; padding: 6px; font-size: 0.85em; color: #d2dae2; line-height: 1.5; text-align: center; border: 1px dashed #7f8fa6; }
+        .schedule-title { color: #ff9f43; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px; }
     </style>
 </head>
 <body>
@@ -121,7 +123,8 @@
             { id: 'k2', cat: '⚔️ 三國專區', name: '三國跨服 快', def: 300, color: '#ffa801' },
             { id: 'l1', cat: '⚔️ 三國專區', name: '本服王', def: 300, color: '#ffa801' },
             { id: 'xj1', cat: '☁️ 仙境專區', name: '仙境一', def: 240, color: '#9b59b6' },
-            { id: 'xj2', cat: '☁️ 仙境專區', name: '仙境二', def: 240, color: '#9b59b6' }
+            { id: 'xj2', cat: '☁️ 仙境專區', name: '仙境二', def: 240, color: '#9b59b6' },
+            { id: 'xj_schedule', cat: '☁️ 仙境專區', name: '每日暗王 (固定)', type: 'schedule', color: '#9b59b6' } 
         ];
 
         function renderUI() {
@@ -132,34 +135,108 @@
                 const bosses = bossData.filter(b => b.cat === cat);
                 let html = `<div class="category-card" style="border-top-color: ${bosses[0].color}"><h3>${cat}</h3>`;
                 bosses.forEach(b => {
-                    // 加入 onkeypress 監聽 Enter 鍵
-                    html += `
-                    <div class="boss-row" id="row_${b.id}">
-                        <div class="boss-info">
-                            <div class="boss-name-group">
-                                <span class="boss-name" title="${b.name}">${b.name}</span>
-                                <span class="expected-time" id="expected_${b.id}">--:-- 刷新</span>
+                    
+                    if (b.type === 'schedule') {
+                        html += `
+                        <div class="boss-row" style="padding-bottom: 9px;">
+                            <div class="boss-info">
+                                <div class="boss-name-group">
+                                    <span class="boss-name" style="color: #ff9f43;">${b.name}</span>
+                                    <span class="expected-time" id="clock_time" style="color: #0fbcf9; font-weight: bold;">--:--:--</span>
+                                </div>
+                                <span class="status" id="schedule_status" style="color: #0be881;">計算中...</span>
                             </div>
-                            <span class="status" id="status_${b.id}">等待中</span>
-                        </div>
-                        <div class="boss-controls">
-                            <div class="input-group">
-                                <span>剩餘分:</span> 
-                                <input type="number" id="time_${b.id}" placeholder="${b.def}" onkeypress="if(event.key === 'Enter') manualStart('${b.id}', ${b.def})">
+                            <div class="schedule-box">
+                                <div class="schedule-title">🕒 預定刷新 9 時段</div>
+                                <div>09:00、10:00、11:00</div>
+                                <div>15:30、16:30、17:30</div>
+                                <div>22:00、23:00、24:00</div>
                             </div>
-                            <div class="button-group">
-                                <button class="action-btn btn-default" onclick="updateCloud('${b.id}', ${b.def})">預設</button>
-                                <button class="action-btn btn-start" onclick="manualStart('${b.id}', ${b.def})">開始</button>
-                                <button class="action-btn btn-stop" onclick="clearCloud('${b.id}')">清除</button>
+                        </div>`;
+                    } else {
+                        html += `
+                        <div class="boss-row" id="row_${b.id}">
+                            <div class="boss-info">
+                                <div class="boss-name-group">
+                                    <span class="boss-name" title="${b.name}">${b.name}</span>
+                                    <span class="expected-time" id="expected_${b.id}">--:-- 刷新</span>
+                                </div>
+                                <span class="status" id="status_${b.id}">等待中</span>
                             </div>
-                        </div>
-                    </div>`;
+                            <div class="boss-controls">
+                                <div class="input-group">
+                                    <span>剩餘分:</span> 
+                                    <input type="number" id="time_${b.id}" placeholder="${b.def}" onkeypress="if(event.key === 'Enter') manualStart('${b.id}', ${b.def})">
+                                </div>
+                                <div class="button-group">
+                                    <button class="action-btn btn-default" onclick="updateCloud('${b.id}', ${b.def})">預設</button>
+                                    <button class="action-btn btn-start" onclick="manualStart('${b.id}', ${b.def})">開始</button>
+                                    <button class="action-btn btn-stop" onclick="clearCloud('${b.id}')">清除</button>
+                                </div>
+                            </div>
+                        </div>`;
+                    }
                 });
                 grid.innerHTML += html + `</div>`;
             });
         }
         
         renderUI();
+
+        // 啟動暗王時刻表自動時鐘與倒數 (更新為 9 個時段)
+        function startScheduleClock() {
+            setInterval(() => {
+                const now = new Date();
+                const h = now.getHours();
+                const m = now.getMinutes();
+                const s = now.getSeconds();
+                
+                const clockEl = document.getElementById('clock_time');
+                if (clockEl) {
+                    clockEl.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                }
+
+                // 更新為 9 個目標分鐘數
+                const targets = [
+                    9*60, 10*60, 11*60, 
+                    15*60+30, 16*60+30, 17*60+30, 
+                    22*60, 23*60, 24*60
+                ];
+                const currentMins = h * 60 + m + (s / 60); 
+
+                let nextTarget = targets.find(t => t > currentMins);
+                let isTomorrow = false;
+                if (nextTarget === undefined) {
+                    nextTarget = targets[0]; // 明天的 09:00
+                    isTomorrow = true;
+                }
+
+                const targetHour = Math.floor(nextTarget / 60) % 24;
+                const targetMin = nextTarget % 60;
+                
+                let targetDate = new Date();
+                if (nextTarget === 24 * 60) {
+                    targetDate.setHours(0, 0, 0, 0);
+                    targetDate.setDate(targetDate.getDate() + 1); 
+                } else {
+                    targetDate.setHours(targetHour, targetMin, 0, 0);
+                    if (isTomorrow) targetDate.setDate(targetDate.getDate() + 1);
+                }
+
+                const diffSec = Math.floor((targetDate.getTime() - now.getTime()) / 1000);
+                
+                const dh = Math.floor(diffSec / 3600);
+                const dm = Math.floor((diffSec % 3600) / 60);
+                const ds = diffSec % 60;
+
+                const statusEl = document.getElementById('schedule_status');
+                if (statusEl) {
+                    statusEl.innerText = `下場剩 ${dh > 0 ? dh + '時' : ''}${dm}分${ds}秒`;
+                }
+            }, 1000);
+        }
+        startScheduleClock();
+
 
         let db;
         let currentEndTimes = {}; 
@@ -183,6 +260,8 @@
             db.ref('bosses').on('value', (snapshot) => {
                 const data = snapshot.val() || {};
                 bossData.forEach(b => {
+                    if (b.type === 'schedule') return; 
+
                     const info = data[b.id];
                     if (info && info.endTime) {
                         if (currentEndTimes[b.id] !== info.endTime) {
@@ -302,12 +381,10 @@
             db.ref('bosses/' + id).set({ endTime: endTime });
         }
 
-        // 修改：加入 defMins 參數，處理防呆機制與框內清空
         function manualStart(id, defMins) {
             const inputEl = document.getElementById('time_' + id);
             let mins = inputEl.value;
             
-            // 防呆：如果什麼都沒填就按 Enter 或開始，預設採用半透明的那個時間
             if (!mins || mins.trim() === '') {
                 mins = defMins;
             } else {
@@ -316,7 +393,6 @@
             
             updateCloud(id, mins);
             
-            // 啟動後自動清空輸入框，並移除輸入游標焦點
             inputEl.value = '';
             inputEl.blur(); 
         }
