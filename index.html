@@ -13,39 +13,44 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e272e; color: #d2dae2; margin: 0; padding: 20px; transition: box-shadow 0.3s; }
-        h1 { text-align: center; color: #0fbcf9; margin-bottom: 10px; }
-        .controls { text-align: center; margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
-        .btn-permission { background: #ff3f34; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e272e; color: #d2dae2; margin: 0; padding: 15px; transition: box-shadow 0.3s; }
+        h1 { text-align: center; color: #0fbcf9; margin-bottom: 10px; font-size: 1.6em; }
+        .controls { text-align: center; margin-bottom: 15px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .btn-permission { background: #ff3f34; color: white; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px; }
         
-        .discord-toggle { background: #2f3640; padding: 12px 20px; border-radius: 8px; border: 1px solid #7289da; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; }
-        .discord-toggle input { transform: scale(1.5); cursor: pointer; }
-        .discord-toggle span { font-weight: bold; color: #7289da; font-size: 1.1em; }
+        .discord-toggle { background: #2f3640; padding: 8px 15px; border-radius: 8px; border: 1px solid #7289da; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+        .discord-toggle input { transform: scale(1.3); cursor: pointer; }
+        .discord-toggle span { font-weight: bold; color: #7289da; font-size: 0.95em; }
 
-        .grid-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; max-width: 1400px; margin: 0 auto; }
-        @media (max-width: 1100px) { .grid-container { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 600px) { .grid-container { grid-template-columns: 1fr; } }
+        /* 網格排版：鎖定 850px 以下才變 2 格，確保 1080p 四分之一視窗 (960px) 依然是 4 格 */
+        .grid-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 1400px; margin: 0 auto; }
+        @media (max-width: 850px) { .grid-container { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 500px) { .grid-container { grid-template-columns: 1fr; } }
 
-        .category-card { background: #485460; padding: 15px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); border-top: 5px solid #0fbcf9; margin-bottom: 10px; }
-        .category-card h3 { margin: 0 0 10px 0; color: #fff; border-bottom: 1px solid #808e9b; padding-bottom: 5px; text-align: center; }
-        .boss-row { display: flex; flex-direction: column; margin-bottom: 12px; background: #3c40c6; padding: 10px; border-radius: 8px; transition: background-color 0.3s; }
+        .category-card { background: #485460; padding: 10px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); border-top: 5px solid #0fbcf9; margin-bottom: 8px; }
+        .category-card h3 { margin: 0 0 8px 0; color: #fff; border-bottom: 1px solid #808e9b; padding-bottom: 5px; text-align: center; font-size: 1.1em; }
+        .boss-row { display: flex; flex-direction: column; margin-bottom: 10px; background: #3c40c6; padding: 8px; border-radius: 8px; transition: background-color 0.3s; }
         
-        .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 5px; }
+        .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 5px; }
         .boss-name-group { display: flex; flex-direction: column; min-width: 0; }
-        .boss-name { font-weight: bold; font-size: 1.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .expected-time { font-size: 0.85em; color: #a4b0be; margin-top: 2px; white-space: nowrap; }
+        .boss-name { font-weight: bold; font-size: 1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .expected-time { font-size: 0.8em; color: #a4b0be; margin-top: 2px; white-space: nowrap; }
         
-        .boss-controls { display: flex; flex-direction: column; gap: 8px; }
-        .input-group { display: flex; align-items: center; justify-content: space-between; font-weight: bold; }
-        .button-group { display: flex; gap: 5px; justify-content: space-between; }
+        .boss-controls { display: flex; flex-direction: column; gap: 6px; }
+        .input-group { display: flex; align-items: center; justify-content: space-between; font-weight: bold; font-size: 0.9em; }
+        .button-group { display: flex; gap: 4px; justify-content: space-between; }
         
-        input[type="number"] { width: 50px; padding: 5px; border-radius: 4px; border: none; text-align: center; font-weight: bold; }
-        button.action-btn { cursor: pointer; border: none; border-radius: 4px; padding: 8px; font-weight: bold; font-size: 0.9em; flex: 1; white-space: nowrap; }
+        /* 全新輸入框樣式：深色底、半透明 Placeholder */
+        input[type="number"] { width: 45px; padding: 4px; border-radius: 4px; border: 1px solid #576574; background: #2f3542; color: #fff; text-align: center; font-weight: bold; outline: none; transition: 0.2s; }
+        input[type="number"]::placeholder { color: rgba(255, 255, 255, 0.4); font-weight: normal; }
+        input[type="number"]:focus { border-color: #0fbcf9; background: #1e272e; box-shadow: 0 0 5px rgba(15, 188, 249, 0.5); }
+        
+        button.action-btn { cursor: pointer; border: none; border-radius: 4px; padding: 6px 2px; font-weight: bold; font-size: 0.85em; flex: 1; white-space: nowrap; }
         .btn-default { background: #3498db; color: white; }
         .btn-start { background: #0be881; color: #1e272e; }
         .btn-stop { background: #ffc048; color: #1e272e; }
         
-        .status { font-weight: bold; color: #ffd32a; font-size: 1.05em; padding: 2px 0px; border-radius: 4px; text-align: right; white-space: nowrap; }
+        .status { font-weight: bold; color: #ffd32a; font-size: 1em; padding: 2px 0px; border-radius: 4px; text-align: right; white-space: nowrap; }
         .status.early-warning { color: #ff9f43; animation: blink 1s infinite alternate; }
         
         @keyframes flashRed { 0% { background-color: rgba(255, 63, 52, 0.5); } 100% { background-color: transparent; } }
@@ -61,7 +66,7 @@
     <div class="controls">
         <label class="discord-toggle">
             <input type="checkbox" id="discordCheckbox">
-            <span>🖥️ 作為伺服器：發送 Discord 通知 (僅建議電腦端打勾)</span>
+            <span>🖥️ 作為伺服器：發送 Discord 通知 (僅電腦端打勾)</span>
         </label>
         <button class="btn-permission" onclick="initAudio()">🔊 點擊授權網頁音效 (必點)</button>
     </div>
@@ -86,7 +91,7 @@
                 audio.currentTime = 0;
                 alert("🔊 網頁提示音效已準備就緒！");
             }).catch(e => {
-                alert("無法播放音效，請確認手機或瀏覽器未開啟靜音設定。");
+                alert("無法播放音效，請確認未開啟靜音設定。");
             });
         }
 
@@ -105,7 +110,6 @@
             }).catch(err => console.log('Discord 發送失敗', err));
         }
 
-        // 修改：三國跨服快 預設改為 300
         const bossData = [
             { id: 'sx1', cat: '🦁 生肖區', name: '生肖 3-5', def: 240, color: '#f53b57' },
             { id: 'sx2', cat: '🦁 生肖區', name: '生肖 6-8', def: 270, color: '#f53b57' },
@@ -128,6 +132,7 @@
                 const bosses = bossData.filter(b => b.cat === cat);
                 let html = `<div class="category-card" style="border-top-color: ${bosses[0].color}"><h3>${cat}</h3>`;
                 bosses.forEach(b => {
+                    // 加入 onkeypress 監聽 Enter 鍵
                     html += `
                     <div class="boss-row" id="row_${b.id}">
                         <div class="boss-info">
@@ -138,10 +143,13 @@
                             <span class="status" id="status_${b.id}">等待中</span>
                         </div>
                         <div class="boss-controls">
-                            <div class="input-group"><span>剩餘分:</span> <input type="number" id="time_${b.id}" value="${b.def}"></div>
+                            <div class="input-group">
+                                <span>剩餘分:</span> 
+                                <input type="number" id="time_${b.id}" placeholder="${b.def}" onkeypress="if(event.key === 'Enter') manualStart('${b.id}', ${b.def})">
+                            </div>
                             <div class="button-group">
                                 <button class="action-btn btn-default" onclick="updateCloud('${b.id}', ${b.def})">預設</button>
-                                <button class="action-btn btn-start" onclick="manualStart('${b.id}')">開始</button>
+                                <button class="action-btn btn-start" onclick="manualStart('${b.id}', ${b.def})">開始</button>
                                 <button class="action-btn btn-stop" onclick="clearCloud('${b.id}')">清除</button>
                             </div>
                         </div>
@@ -154,7 +162,7 @@
         renderUI();
 
         let db;
-        let currentEndTimes = {}; // 新增：精準記錄每一隻王的目標時間，防止互相干擾洗頻
+        let currentEndTimes = {}; 
         let localTimers = {};
         let warned = {};
         let warningBosses = new Set(); 
@@ -177,13 +185,11 @@
                 bossData.forEach(b => {
                     const info = data[b.id];
                     if (info && info.endTime) {
-                        // 【防洗頻核心】：只有當這隻王的時間「真的被更改」時，才重新載入計時器
                         if (currentEndTimes[b.id] !== info.endTime) {
                             currentEndTimes[b.id] = info.endTime;
                             runLocalTimer(b.id, info.endTime, b.name);
                         }
                     } else {
-                        // 如果雲端沒有這隻王，代表被清除了，安全關閉計時器
                         if (currentEndTimes[b.id]) {
                             delete currentEndTimes[b.id];
                             stopLocalTimer(b.id);
@@ -273,7 +279,7 @@
         function stopLocalTimer(id) {
             if (localTimers[id]) clearInterval(localTimers[id]);
             
-            warned[id] = false; // 徹底清除警告狀態
+            warned[id] = false; 
             warningBosses.delete(id);
             updateGlobalFlash();
 
@@ -296,9 +302,23 @@
             db.ref('bosses/' + id).set({ endTime: endTime });
         }
 
-        function manualStart(id) {
-            const mins = document.getElementById('time_' + id).value;
+        // 修改：加入 defMins 參數，處理防呆機制與框內清空
+        function manualStart(id, defMins) {
+            const inputEl = document.getElementById('time_' + id);
+            let mins = inputEl.value;
+            
+            // 防呆：如果什麼都沒填就按 Enter 或開始，預設採用半透明的那個時間
+            if (!mins || mins.trim() === '') {
+                mins = defMins;
+            } else {
+                mins = parseFloat(mins);
+            }
+            
             updateCloud(id, mins);
+            
+            // 啟動後自動清空輸入框，並移除輸入游標焦點
+            inputEl.value = '';
+            inputEl.blur(); 
         }
 
         function clearCloud(id) { 
