@@ -28,9 +28,9 @@
 
         .category-card { background: #485460; padding: 10px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); border-top: 5px solid #0fbcf9; margin-bottom: 8px; }
         .category-card h3 { margin: 0 0 8px 0; color: #fff; border-bottom: 1px solid #808e9b; padding-bottom: 5px; text-align: center; font-size: 1.1em; }
-        .boss-row { display: flex; flex-direction: column; margin-bottom: 10px; background: #3c40c6; padding: 8px; border-radius: 8px; transition: background-color 0.3s; }
+        .boss-row { display: flex; flex-direction: column; margin-bottom: 10px; background: #3c40c6; padding: 8px; border-radius: 8px; transition: background-color 0.3s; height: 90px; justify-content: space-between; } /* 統一高度排版 */
         
-        .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 5px; }
+        .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 5px; }
         .boss-name-group { display: flex; flex-direction: column; min-width: 0; }
         .boss-name { font-weight: bold; font-size: 1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .expected-time { font-size: 0.8em; color: #a4b0be; margin-top: 2px; white-space: nowrap; }
@@ -56,6 +56,9 @@
         @keyframes blink { from { opacity: 1; } to { opacity: 0.4; } }
         @keyframes pageFlash { 0% { box-shadow: inset 0 0 80px rgba(255, 63, 52, 0.9); } 100% { box-shadow: inset 0 0 0px transparent; } }
         .body-flash { animation: pageFlash 1s infinite alternate; }
+        
+        /* 針對暗王時間高光的特效 */
+        .highlight-time { transition: 0.3s; }
     </style>
 </head>
 <body>
@@ -133,20 +136,20 @@
                 bosses.forEach(b => {
                     
                     if (b.type === 'schedule') {
-                        // 極簡化暗王面板，高度完美對齊一般 BOSS
+                        // 極簡化暗王面板：時鐘加大改紅字、往右退，下排時段間距縮小填補
                         html += `
                         <div class="boss-row" id="row_${b.id}">
                             <div class="boss-info">
                                 <div class="boss-name-group">
-                                    <span class="boss-name" style="color: #ff9f43;">${b.name}</span>
-                                    <span class="expected-time" id="clock_time" style="color: #0fbcf9; font-weight: bold;">--:--:--</span>
+                                    <span class="boss-name" style="color: #ff9f43; font-size: 1.05em;">${b.name}</span>
+                                    <span class="expected-time" id="clock_time" style="color: #ff3f34; font-size: 1.25em; font-weight: bold; margin-left: 8px; margin-top: 2px;">--:--:--</span>
                                 </div>
-                                <span class="status" id="schedule_status" style="color: #0be881;">計算中...</span>
+                                <span class="status" id="schedule_status" style="color: #0be881; font-size: 1.05em;">計算中...</span>
                             </div>
-                            <div class="boss-controls" style="align-items: center; justify-content: center; color: #808e9b; font-size: 0.9em; letter-spacing: 1px; line-height: 1.6; padding: 2px 0;">
-                                <div>09:00 、 10:00 、 11:00</div>
-                                <div>15:30 、 16:30 、 17:30</div>
-                                <div>22:00 、 23:00 、 24:00</div>
+                            <div class="boss-controls" style="display: flex; flex-direction: column; justify-content: center; gap: 4px; color: #808e9b; font-size: 0.95em; font-weight: bold; letter-spacing: 1px; padding-bottom: 2px;">
+                                <div style="display: flex; justify-content: space-around;"><span id="t_0900" class="highlight-time">09:00</span> <span id="t_1000" class="highlight-time">10:00</span> <span id="t_1100" class="highlight-time">11:00</span></div>
+                                <div style="display: flex; justify-content: space-around;"><span id="t_1530" class="highlight-time">15:30</span> <span id="t_1630" class="highlight-time">16:30</span> <span id="t_1730" class="highlight-time">17:30</span></div>
+                                <div style="display: flex; justify-content: space-around;"><span id="t_2200" class="highlight-time">22:00</span> <span id="t_2300" class="highlight-time">23:00</span> <span id="t_2400" class="highlight-time">24:00</span></div>
                             </div>
                         </div>`;
                     } else {
@@ -181,6 +184,13 @@
 
         // 啟動暗王時刻表自動時鐘與倒數
         function startScheduleClock() {
+            // 綁定各個時段對應的 HTML ID
+            const scheduleTimes = [
+                { h: 9, m: 0, id: 't_0900' }, { h: 10, m: 0, id: 't_1000' }, { h: 11, m: 0, id: 't_1100' },
+                { h: 15, m: 30, id: 't_1530' }, { h: 16, m: 30, id: 't_1630' }, { h: 17, m: 30, id: 't_1730' },
+                { h: 22, m: 0, id: 't_2200' }, { h: 23, m: 0, id: 't_2300' }, { h: 24, m: 0, id: 't_2400' }
+            ];
+
             setInterval(() => {
                 const now = new Date();
                 const h = now.getHours();
@@ -192,12 +202,36 @@
                     clockEl.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
                 }
 
+                const currentMins = h * 60 + m + (s / 60); 
+
+                // 處理 3分鐘高光特效
+                scheduleTimes.forEach(t => {
+                    let isHighlight = false;
+                    if (t.h === 24) {
+                        if (h === 0 && m < 3) isHighlight = true;
+                    } else {
+                        const tMins = t.h * 60 + t.m;
+                        if (currentMins >= tMins && currentMins < tMins + 3) isHighlight = true;
+                    }
+
+                    const el = document.getElementById(t.id);
+                    if (el) {
+                        if (isHighlight) {
+                            el.style.color = '#ff3f34';
+                            el.style.textShadow = '0 0 8px rgba(255, 63, 52, 0.8)';
+                        } else {
+                            el.style.color = '';
+                            el.style.textShadow = '';
+                        }
+                    }
+                });
+
+                // 計算下一次倒數時間
                 const targets = [
                     9*60, 10*60, 11*60, 
                     15*60+30, 16*60+30, 17*60+30, 
                     22*60, 23*60, 24*60
                 ];
-                const currentMins = h * 60 + m + (s / 60); 
 
                 let nextTarget = targets.find(t => t > currentMins);
                 let isTomorrow = false;
@@ -226,7 +260,6 @@
 
                 const statusEl = document.getElementById('schedule_status');
                 if (statusEl) {
-                    // 拿掉「下場剩」，格式與一般計時器完全相同
                     statusEl.innerText = dh > 0 ? `${dh}時${dm}分${ds}秒` : `${dm}分${ds}秒`;
                 }
             }, 1000);
