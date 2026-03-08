@@ -29,13 +29,13 @@
         .category-card { background: #485460; padding: 10px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); border-top: 5px solid #0fbcf9; margin-bottom: 8px; }
         .category-card h3 { margin: 0 0 8px 0; color: #fff; border-bottom: 1px solid #808e9b; padding-bottom: 5px; text-align: center; font-size: 1.1em; }
         
-        /* 拔除固定高度，讓格子自然延展對齊 */
+        /* 恢復自然延展對齊，不再強制寫死高度 */
         .boss-row { display: flex; flex-direction: column; margin-bottom: 10px; background: #3c40c6; padding: 8px; border-radius: 8px; transition: background-color 0.3s; }
         
         .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 5px; }
         .boss-name-group { display: flex; flex-direction: column; min-width: 0; }
-        .boss-name { font-weight: bold; font-size: 1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .expected-time { font-size: 0.8em; color: #a4b0be; margin-top: 2px; white-space: nowrap; }
+        .boss-name { font-weight: bold; font-size: 1.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .expected-time { font-size: 0.85em; color: #a4b0be; margin-top: 2px; white-space: nowrap; }
         
         .boss-controls { display: flex; flex-direction: column; gap: 6px; }
         .input-group { display: flex; align-items: center; justify-content: space-between; font-weight: bold; font-size: 0.9em; }
@@ -137,17 +137,17 @@
                 bosses.forEach(b => {
                     
                     if (b.type === 'schedule') {
-                        // 完美排版：暗王與紅字時鐘並排，下方間距壓扁
+                        // 【骨架完美統一】：時鐘移至左下，與一般格子的「預計刷新」位子完全對齊
                         html += `
                         <div class="boss-row" id="row_${b.id}">
-                            <div class="boss-info" style="margin-bottom: 2px;">
-                                <div style="display: flex; align-items: baseline; gap: 8px;">
-                                    <span class="boss-name" style="color: #ff9f43; font-size: 1.05em;">${b.name}</span>
-                                    <span id="clock_time" style="color: #ff3f34; font-size: 1.15em; font-weight: bold; letter-spacing: 0.5px;">--:--:--</span>
+                            <div class="boss-info">
+                                <div class="boss-name-group">
+                                    <span class="boss-name" title="${b.name}">${b.name}</span>
+                                    <span class="expected-time" style="color: #0fbcf9; font-weight: bold; letter-spacing: 0.5px;">目前 <span id="clock_time">--:--:--</span></span>
                                 </div>
-                                <span class="status" id="schedule_status" style="color: #0be881; font-size: 1.05em;">計算中...</span>
+                                <span class="status" id="schedule_status">計算中...</span>
                             </div>
-                            <div class="boss-controls" style="display: flex; flex-direction: column; justify-content: center; gap: 3px; color: #808e9b; font-size: 0.85em; font-weight: bold; letter-spacing: 1px;">
+                            <div class="boss-controls" style="display: flex; flex-direction: column; justify-content: space-evenly; flex-grow: 1; color: #808e9b; font-size: 0.9em; font-weight: bold; letter-spacing: 1px;">
                                 <div style="display: flex; justify-content: space-around;"><span id="t_0900" class="highlight-time">09:00</span> <span id="t_1000" class="highlight-time">10:00</span> <span id="t_1100" class="highlight-time">11:00</span></div>
                                 <div style="display: flex; justify-content: space-around;"><span id="t_1530" class="highlight-time">15:30</span> <span id="t_1630" class="highlight-time">16:30</span> <span id="t_1730" class="highlight-time">17:30</span></div>
                                 <div style="display: flex; justify-content: space-around;"><span id="t_2200" class="highlight-time">22:00</span> <span id="t_2300" class="highlight-time">23:00</span> <span id="t_2400" class="highlight-time">24:00</span></div>
@@ -187,7 +187,7 @@
             const scheduleTimes = [
                 { h: 9, m: 0, id: 't_0900' }, { h: 10, m: 0, id: 't_1000' }, { h: 11, m: 0, id: 't_1100' },
                 { h: 15, m: 30, id: 't_1530' }, { h: 16, m: 30, id: 't_1630' }, { h: 17, m: 30, id: 't_1730' },
-                { h: 22, m: 0, id: 't_2200' }, { h: 23, m: 0, id: 't_2300' }, { h: 24, m: 0, id: 't_2400' }
+                { h: 22, m: 0, id: 't_2200' }, { h: 23, m: 0, id: 't_2300' }, { h: 0, m: 0, id: 't_2400' } // 24:00 其實是 00:00
             ];
 
             setInterval(() => {
@@ -203,18 +203,18 @@
 
                 const currentMins = h * 60 + m + (s / 60); 
 
-                scheduleTimes.forEach(t => {
-                    let isHighlight = false;
-                    if (t.h === 24) {
-                        if (h === 0 && m < 3) isHighlight = true;
-                    } else {
-                        const tMins = t.h * 60 + t.m;
-                        if (currentMins >= tMins && currentMins < tMins + 3) isHighlight = true;
-                    }
+                // 檢查是否剛出生 (3分鐘內)
+                let activeTarget = scheduleTimes.find(t => {
+                    let tMins = t.h * 60 + t.m;
+                    if (currentMins >= tMins && currentMins < tMins + 3) return true;
+                    return false;
+                });
 
+                // 更新下方九宮格的高光特效
+                scheduleTimes.forEach(t => {
                     const el = document.getElementById(t.id);
                     if (el) {
-                        if (isHighlight) {
+                        if (activeTarget && activeTarget.id === t.id) {
                             el.style.color = '#ff3f34';
                             el.style.textShadow = '0 0 8px rgba(255, 63, 52, 0.8)';
                         } else {
@@ -224,40 +224,35 @@
                     }
                 });
 
-                const targets = [
-                    9*60, 10*60, 11*60, 
-                    15*60+30, 16*60+30, 17*60+30, 
-                    22*60, 23*60, 24*60
-                ];
-
+                // 計算距離下一場的倒數
+                const targets = [0, 9*60, 10*60, 11*60, 15*60+30, 16*60+30, 17*60+30, 22*60, 23*60].sort((a,b)=>a-b);
                 let nextTarget = targets.find(t => t > currentMins);
-                let isTomorrow = false;
-                if (nextTarget === undefined) {
-                    nextTarget = targets[0]; 
-                    isTomorrow = true;
-                }
-
-                const targetHour = Math.floor(nextTarget / 60) % 24;
-                const targetMin = nextTarget % 60;
-                
                 let targetDate = new Date();
-                if (nextTarget === 24 * 60) {
-                    targetDate.setHours(0, 0, 0, 0);
+
+                if (nextTarget === undefined) {
+                    nextTarget = 0; 
                     targetDate.setDate(targetDate.getDate() + 1); 
-                } else {
-                    targetDate.setHours(targetHour, targetMin, 0, 0);
-                    if (isTomorrow) targetDate.setDate(targetDate.getDate() + 1);
                 }
+                targetDate.setHours(Math.floor(nextTarget / 60), nextTarget % 60, 0, 0);
 
                 const diffSec = Math.floor((targetDate.getTime() - now.getTime()) / 1000);
-                
                 const dh = Math.floor(diffSec / 3600);
                 const dm = Math.floor((diffSec % 3600) / 60);
                 const ds = diffSec % 60;
 
                 const statusEl = document.getElementById('schedule_status');
                 if (statusEl) {
-                    statusEl.innerText = dh > 0 ? `${dh}時${dm}分${ds}秒` : `${dm}分${ds}秒`;
+                    if (activeTarget) {
+                        // 剛出生的 3 分鐘內：顯示紅色已刷新
+                        statusEl.innerText = `🚨 已刷新!`;
+                        statusEl.style.color = '#ff3f34';
+                        statusEl.classList.add('overtime-flash');
+                    } else {
+                        // 平常狀態：與其他格子一模一樣的黃色倒數
+                        statusEl.innerText = dh > 0 ? `${dh}時${dm}分${ds}秒` : `${dm}分${ds}秒`;
+                        statusEl.style.color = ''; // 恢復預設黃色
+                        statusEl.classList.remove('overtime-flash');
+                    }
                 }
             }, 1000);
         }
