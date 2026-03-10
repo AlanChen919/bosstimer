@@ -29,7 +29,6 @@
         .category-card { background: #485460; padding: 10px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); border-top: 5px solid #0fbcf9; margin-bottom: 8px; }
         .category-card h3 { margin: 0 0 8px 0; color: #fff; border-bottom: 1px solid #808e9b; padding-bottom: 5px; text-align: center; font-size: 1.1em; }
         
-        /* 恢復自然延展對齊，不再強制寫死高度 */
         .boss-row { display: flex; flex-direction: column; margin-bottom: 10px; background: #3c40c6; padding: 8px; border-radius: 8px; transition: background-color 0.3s; }
         
         .boss-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 5px; }
@@ -41,7 +40,10 @@
         .input-group { display: flex; align-items: center; justify-content: space-between; font-weight: bold; font-size: 0.9em; }
         .button-group { display: flex; gap: 4px; justify-content: space-between; }
         
-        input[type="number"] { width: 45px; padding: 4px; border-radius: 4px; border: 1px solid #576574; background: #2f3542; color: #fff; text-align: center; font-weight: bold; outline: none; transition: 0.2s; }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        input[type="number"] { -moz-appearance: textfield; width: 45px; padding: 4px; border-radius: 4px; border: 1px solid #576574; background: #2f3542; color: #fff; text-align: center; font-weight: bold; outline: none; transition: 0.2s; }
         input[type="number"]::placeholder { color: rgba(255, 255, 255, 0.4); font-weight: normal; }
         input[type="number"]:focus { border-color: #0fbcf9; background: #1e272e; box-shadow: 0 0 5px rgba(15, 188, 249, 0.5); }
         
@@ -137,12 +139,11 @@
                 bosses.forEach(b => {
                     
                     if (b.type === 'schedule') {
-                        // 【骨架完美統一】：時鐘移至左下，與一般格子的「預計刷新」位子完全對齊
                         html += `
                         <div class="boss-row" id="row_${b.id}">
                             <div class="boss-info">
                                 <div class="boss-name-group">
-                                    <span class="boss-name" title="${b.name}">${b.name}</span>
+                                    <span class="boss-name" style="color: #ff9f43;">${b.name}</span>
                                     <span class="expected-time" style="color: #0fbcf9; font-weight: bold; letter-spacing: 0.5px;">目前 <span id="clock_time">--:--:--</span></span>
                                 </div>
                                 <span class="status" id="schedule_status">計算中...</span>
@@ -187,8 +188,10 @@
             const scheduleTimes = [
                 { h: 9, m: 0, id: 't_0900' }, { h: 10, m: 0, id: 't_1000' }, { h: 11, m: 0, id: 't_1100' },
                 { h: 15, m: 30, id: 't_1530' }, { h: 16, m: 30, id: 't_1630' }, { h: 17, m: 30, id: 't_1730' },
-                { h: 22, m: 0, id: 't_2200' }, { h: 23, m: 0, id: 't_2300' }, { h: 0, m: 0, id: 't_2400' } // 24:00 其實是 00:00
+                { h: 22, m: 0, id: 't_2200' }, { h: 23, m: 0, id: 't_2300' }, { h: 0, m: 0, id: 't_2400' }
             ];
+
+            let lastAlarmedId = null; // 防暴音守衛：記錄哪個時段已經響過了
 
             setInterval(() => {
                 const now = new Date();
@@ -203,14 +206,12 @@
 
                 const currentMins = h * 60 + m + (s / 60); 
 
-                // 檢查是否剛出生 (3分鐘內)
                 let activeTarget = scheduleTimes.find(t => {
                     let tMins = t.h * 60 + t.m;
                     if (currentMins >= tMins && currentMins < tMins + 3) return true;
                     return false;
                 });
 
-                // 更新下方九宮格的高光特效
                 scheduleTimes.forEach(t => {
                     const el = document.getElementById(t.id);
                     if (el) {
@@ -224,7 +225,6 @@
                     }
                 });
 
-                // 計算距離下一場的倒數
                 const targets = [0, 9*60, 10*60, 11*60, 15*60+30, 16*60+30, 17*60+30, 22*60, 23*60].sort((a,b)=>a-b);
                 let nextTarget = targets.find(t => t > currentMins);
                 let targetDate = new Date();
@@ -243,15 +243,22 @@
                 const statusEl = document.getElementById('schedule_status');
                 if (statusEl) {
                     if (activeTarget) {
-                        // 剛出生的 3 分鐘內：顯示紅色已刷新
                         statusEl.innerText = `🚨 已刷新!`;
                         statusEl.style.color = '#ff3f34';
                         statusEl.classList.add('overtime-flash');
+                        
+                        // 只在第一次偵測到該時段時，響一次聲音 (不發送 DC)
+                        if (lastAlarmedId !== activeTarget.id) {
+                            lastAlarmedId = activeTarget.id;
+                            playAlarm(); 
+                        }
                     } else {
-                        // 平常狀態：與其他格子一模一樣的黃色倒數
                         statusEl.innerText = dh > 0 ? `${dh}時${dm}分${ds}秒` : `${dm}分${ds}秒`;
-                        statusEl.style.color = ''; // 恢復預設黃色
+                        statusEl.style.color = ''; 
                         statusEl.classList.remove('overtime-flash');
+                        
+                        // 時間過了 3 分鐘後重置守衛，為下一次出怪做準備
+                        lastAlarmedId = null;
                     }
                 }
             }, 1000);
